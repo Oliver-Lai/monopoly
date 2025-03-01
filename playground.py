@@ -1,11 +1,12 @@
 import random as rd
 class player:
-    def __init__(self,money):
+    def __init__(self,money,name):
         self.__money = money
         self.__state = 0
         self.__prison = 0
         self.__bankrupt = -1
         self.__turn = 0
+        self.__name = name
 
     def check_is_prison(self):
         if(self.get_prison()>0):
@@ -57,6 +58,9 @@ class player:
         
     def get_turn(self):
         return self.__turn
+
+    def get_name(self):
+        return self.__name
 
     def __set_money(self,money):
         self.__money = money
@@ -138,14 +142,309 @@ class monopoly():
     
     def __init_player(self,players_money,player_num):
         for i in range(player_num):
-            self.__total_players.append(player(players_money))
+            self.__total_players.append(player(players_money,chr(65+i)))
+    
+    def get_turn(self):
+        return self.__trun
+    
+    def get_win_land(self):
+        num = 0
+        for i in self.__onwer_list:
+            if(i!=None):
+                num += 1
+        return num
+    
 
-# play_map = [100,200,300,400,500,600,700]
-# a = monopoly(1000,3,play_map,1,3)
-# temp,owner = a.play_game()
-# for index,i in enumerate(temp):
-#     if(i.get_bankrupt()==-1):
-#         win = index
-#     print(index,' ',i.get_bankrupt(),i.get_turn())
-# print(owner)
-# print("winner is ",win)
+class monopoly_no_prison():
+    def __init__(self,players_money,player_num,map,run):
+        self.__total_players = []
+        self.__init_player(players_money,player_num)
+        self.__bankrupt_num = 0
+        self.__map = map
+        self.__map_size = len(map)
+        self.__onwer_list = [None]*len(map)
+        self.__trun = 0
+        self.__run = run
+    
+    def play_game(self):
+        rd.seed(self.__run)
+        while True:
+            self.__trun += 1
+            for index in range(len(self.__total_players)):
+                # 確認當前玩家是否破產
+                if(self.__total_players[index].get_bankrupt()!=-1):
+                    continue
+                else:
+                    self.__total_players[index].turn_up()
+                # 當前玩家擲骰子
+                state = self.__total_players[index].roll_dice(self.__map_size)
+                onwer = self.__onwer_list[state]
+                money = self.__map[state]
+                # 若走到沒有人的土地則嘗試買入
+                if(onwer==None):
+                    if(self.__total_players[index].buy(money)==True):
+                        self.__onwer_list[state]=index
+                # 若走到別人的土地則要付過路費給對方
+                elif(onwer!=index):
+                    if(self.__total_players[index].pay_bill(money*0.25 ,state) == True):
+                        self.__total_players[onwer].earn(money*0.25)
+                    else:
+                        self.__bankrupt_num += 1
+                        for i,j in enumerate(self.__onwer_list):
+                            if(j==index): #若玩家破產則土地充公
+                                self.__onwer_list[i] = None
+                        self.__total_players[onwer].earn(self.__total_players[index].get_money())
+                        if(self.__bankrupt_num==len(self.__total_players)-1):
+                            return self.__total_players
+    
+    def __init_player(self,players_money,player_num):
+        for i in range(player_num):
+            self.__total_players.append(player(players_money,chr(65+i)))
+    
+    def get_turn(self):
+        return self.__trun
+    
+    def get_win_land(self):
+        num = 0
+        for i in self.__onwer_list:
+            if(i!=None):
+                num += 1
+        return num
+
+class monopoly_with_bill():
+    def __init__(self,players_money,player_num,map,prison_location,prison_day,run,bill):
+        self.__total_players = []
+        self.__init_player(players_money,player_num)
+        self.__bankrupt_num = 0
+        self.__map = map
+        self.__map_size = len(map)
+        self.__onwer_list = [None]*len(map)
+        self.__prison_location = prison_location
+        self.__prison_day = prison_day
+        self.__trun = 0
+        self.__run = run
+        self.__bill = bill
+    
+    def play_game(self):
+        rd.seed(self.__run)
+        while True:
+            self.__trun += 1
+            for index in range(len(self.__total_players)):
+                # 確認當前玩家是否破產
+                if(self.__total_players[index].get_bankrupt()!=-1):
+                    continue
+                else:
+                    self.__total_players[index].turn_up()
+                # 確認當前玩家是否在監獄中
+                if(self.__total_players[index].check_is_prison()==True):
+                    continue
+                
+                # 當前玩家擲骰子
+                state = self.__total_players[index].roll_dice(self.__map_size)
+                # 若走到監獄則進監獄並支付罰金
+                if(state==self.__prison_location):
+                    self.__total_players[index].go_to_prison(self.__prison_day)
+                    if(self.__total_players[index].pay_bill(self.__bill,state) == True):
+                        continue
+                    else:
+                        self.__bankrupt_num += 1
+                        for i,j in enumerate(self.__onwer_list):
+                            if(j==index): #若玩家破產則土地充公
+                                self.__onwer_list[i] = None
+                        if(self.__bankrupt_num==len(self.__total_players)-1):
+                            return self.__total_players
+                        continue
+                onwer = self.__onwer_list[state]
+                money = self.__map[state]
+                # 若走到沒有人的土地則嘗試買入
+                if(onwer==None):
+                    if(self.__total_players[index].buy(money)==True):
+                        self.__onwer_list[state]=index
+                # 若走到別人的土地則要付過路費給對方
+                elif(onwer!=index):
+                    if(self.__total_players[index].pay_bill(money*0.25 ,state) == True):
+                        self.__total_players[onwer].earn(money*0.25)
+                    else:
+                        self.__bankrupt_num += 1
+                        for i,j in enumerate(self.__onwer_list):
+                            if(j==index): #若玩家破產則土地充公
+                                self.__onwer_list[i] = None
+                        self.__total_players[onwer].earn(self.__total_players[index].get_money())
+                        if(self.__bankrupt_num==len(self.__total_players)-1):
+                            return self.__total_players
+    
+    def __init_player(self,players_money,player_num):
+        for i in range(player_num):
+            self.__total_players.append(player(players_money,chr(65+i)))
+    
+    def get_turn(self):
+        return self.__trun
+    
+    def get_win_land(self):
+        num = 0
+        for i in self.__onwer_list:
+            if(i!=None):
+                num += 1
+        return num
+
+class monopoly_with_early_out_prison():
+    def __init__(self, players_money, player_num, game_map, prison_location, prison_day, run):
+        self.__total_players = []
+        self.__init_player(players_money, player_num)
+        self.__bankrupt_num = 0
+        self.__map = game_map
+        self.__map_size = len(game_map)
+        self.__owner_list = [None] * len(game_map)
+        self.__prison_location = prison_location
+        self.__prison_day = prison_day
+        self.__turn = 0
+        self.__run = run
+    
+    def play_game(self):
+        rd.seed(self.__run)
+        while True:
+            self.__turn += 1
+            for index in range(len(self.__total_players)):
+                # 確認當前玩家是否破產
+                if self.__total_players[index].get_bankrupt() != -1:
+                    continue
+                else:
+                    self.__total_players[index].turn_up()
+                
+                
+                # 在監獄內擲骰子決定是否提前出獄
+                if self.__total_players[index].check_is_prison():
+                    dice = rd.randint(1, 6)
+                    if dice % 2 == 0:  # 擲出雙數提前離開
+                        self.__total_players[index].go_to_prison(0)
+                    else:
+                        continue
+                
+                # 擲骰子，若在監獄則保持不動，否則移動
+                
+                state = self.__total_players[index].roll_dice(self.__map_size)
+                
+                # 若走到監獄則進監獄
+                if state == self.__prison_location:
+                    self.__total_players[index].go_to_prison(self.__prison_day)
+                    continue
+                
+                owner = self.__owner_list[state]
+                money = self.__map[state]
+                
+                # 若走到無主土地則嘗試購買
+                if owner is None:
+                    if self.__total_players[index].buy(money):
+                        self.__owner_list[state] = index
+                # 若走到別人土地則付過路費，即使在監獄內
+                elif owner != index:
+                    if self.__total_players[index].pay_bill(money * 0.25, state):
+                        self.__total_players[owner].earn(money * 0.25)
+                    else:
+                        self.__bankrupt_num += 1
+                        for i, j in enumerate(self.__owner_list):
+                            if j == index:  # 玩家破產則土地充公
+                                self.__owner_list[i] = None
+                        self.__total_players[owner].earn(self.__total_players[index].get_money())
+                        if self.__bankrupt_num == len(self.__total_players) - 1:
+                            return self.__total_players
+    
+    def __init_player(self, players_money, player_num):
+        for i in range(player_num):
+            self.__total_players.append(player(players_money,chr(65+i)))
+    
+    def get_turn(self):
+        return self.__turn
+    
+    def get_win_land(self):
+        num = 0
+        for i in self.__onwer_list:
+            if(i!=None):
+                num += 1
+        return num
+    
+
+class monopoly_with_fair_prison():
+    def __init__(self, players_money, player_num, game_map, prison_location, prison_day, run, prison_fine):
+        self.__total_players = []
+        self.__init_player(players_money, player_num)
+        self.__bankrupt_num = 0
+        self.__map = game_map
+        self.__map_size = len(game_map)
+        self.__owner_list = [None] * len(game_map)
+        self.__prison_location = prison_location
+        self.__prison_day = prison_day
+        self.__turn = 0
+        self.__run = run
+        self.__prison_fine = prison_fine
+    
+    def play_game(self):
+        rd.seed(self.__run)
+        while True:
+            self.__turn += 1
+            for index in range(len(self.__total_players)):
+                # 確認當前玩家是否破產
+                if self.__total_players[index].get_bankrupt() != -1:
+                    continue
+                else:
+                    self.__total_players[index].turn_up()
+                
+                # 在監獄內擲骰子決定是否提前出獄
+                if self.__total_players[index].check_is_prison():
+                    dice = rd.randint(1, 6)
+                    if dice % 2 == 0:  # 擲出雙數提前離開
+                        self.__total_players[index].go_to_prison(0)
+                        in_prison = False
+                    else:
+                        continue
+                
+                # 擲骰子
+                state = self.__total_players[index].roll_dice(self.__map_size)
+                
+                # 若走到監獄則進監獄，並支付罰金
+                if state == self.__prison_location:
+                    self.__total_players[index].go_to_prison(self.__prison_day)
+                    if(self.__total_players[index].pay_bill(self.__prison_fine,state) == True):
+                        continue
+                    else:
+                        self.__bankrupt_num += 1
+                        for i,j in enumerate(self.__owner_list):
+                            if(j==index): #若玩家破產則土地充公
+                                self.__owner_list[i] = None
+                        if(self.__bankrupt_num==len(self.__total_players)-1):
+                            return self.__total_players
+                        continue
+                
+                owner = self.__owner_list[state]
+                money = self.__map[state]
+                
+                # 若走到無主土地則嘗試購買
+                if owner is None:
+                    if self.__total_players[index].buy(money):
+                        self.__owner_list[state] = index
+                # 若走到別人土地則付過路費
+                elif owner != index:
+                    if self.__total_players[index].pay_bill(money * 0.25, state):
+                        self.__total_players[owner].earn(money * 0.25)
+                    else:
+                        self.__bankrupt_num += 1
+                        for i, j in enumerate(self.__owner_list):
+                            if j == index:  # 玩家破產則土地充公
+                                self.__owner_list[i] = None
+                        self.__total_players[owner].earn(self.__total_players[index].get_money())
+                        if self.__bankrupt_num == len(self.__total_players) - 1:
+                            return self.__total_players
+    
+    def __init_player(self, players_money, player_num):
+        for i in range(player_num):
+            self.__total_players.append(player(players_money,chr(65+i)))
+    
+    def get_turn(self):
+        return self.__turn
+    
+    def get_win_land(self):
+        num = 0
+        for i in self.__owner_list:
+            if(i!=None):
+                num += 1
+        return num
